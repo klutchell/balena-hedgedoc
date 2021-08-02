@@ -1,0 +1,42 @@
+version: "2.1"
+
+volumes:
+  config:
+  mysql:
+
+services:
+  app:
+    build: app
+    volumes:
+      - config:/config
+    environment:
+      - DB_HOST=db
+      - DB_NAME=hedgedoc
+      - DB_USER=hedgedoc
+      - DB_PASS=hedgedoc
+      - DB_PORT=3306
+    ports:
+      - 80:3000/tcp
+    depends_on:
+      - db
+    labels:
+      - io.balena.features.supervisor-api=1
+
+  # https://hub.docker.com/r/yobasystems/alpine-mariadb
+  db:
+    image: yobasystems/alpine-mariadb
+    volumes:
+      - mysql:/var/lib/mysql
+    environment:
+      - MYSQL_DATABASE=hedgedoc
+      - MYSQL_USER=hedgedoc
+      - MYSQL_PASSWORD=hedgedoc
+      - MYSQL_ROOT_PASSWORD=balena
+    # Repurpose the healthcheck cmd by having it export our database on a schedule.
+    # Run the backup every 1 hour to a file called hourly-backup.sql.
+    # How to restore: <https://mariadb.com/kb/en/mysqldump/#restoring>
+    healthcheck:
+      test: mysqldump -uroot -p$MYSQL_ROOT_PASSWORD --all-databases --result-file=/var/lib/mysql/hourly-backup.sql || exit 0
+      interval: 1h
+      timeout: 30s
+      retries: 3
